@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { 
   Building2, 
@@ -11,6 +11,12 @@ import {
 import { useAppStore } from '../../store';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
+import { Label } from '../ui/label';
+import { Input } from '../ui/input';
+import { generateCSV, generatePDF, downloadFile } from '../../lib/export';
+import { useToast } from '../../hooks/use-toast';
+import type { Dataset, ExportFormat, ExportRecord } from '../../store/types';
 
 const NAV_ITEMS = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
@@ -21,7 +27,61 @@ const NAV_ITEMS = [
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const { datasets, activeDatasetId, setActiveDataset } = useAppStore();
+  const { datasets, activeDatasetId, setActiveDataset, addExport } = useAppStore();
+  const dataset = useMemo(() => datasets.find(item => item.id === activeDatasetId), [datasets, activeDatasetId]);
+  const [downloadOpen, setDownloadOpen] = useState(false);
+  const [format, setFormat] = useState<ExportFormat>('pdf');
+  const [startDate, setStartDate] = useState(dataset?.profile.dateRange.start ?? '');
+  const [endDate, setEndDate] = useState(dataset?.profile.dateRange.end ?? '');
+  const { toast } = useToast();
+
+  const openDownload = () => {
+    setStartDate(dataset?.profile.dateRange.start ?? '');
+    setEndDate(dataset?.profile.dateRange.end ?? '');
+    setDownloadOpen(true);
+  };
+
+  const handleStatementDownload = () => {
+    if (!dataset || !startDate || !endDate || startDate > endDate) return;
+    const transactions = dataset.transactions.filter(transaction => {
+      const date = transaction.date.slice(0, 10);
+      return date >= startDate && date <= endDate;
+    });
+
+    if (transactions.length === 0) {
+      toast({ title: 'No transactions found', description: 'Choose a date range containing account activity.', variant: 'destructive' });
+      return;
+    }
+
+    const first = transactions[0];
+    const openingBalance = first.balance - (first.type === 'credit' ? first.amount : -first.amount);
+    const statement: Dataset = {
+      ...dataset,
+      transactions,
+      openingBalance,
+      closingBalance: transactions[transactions.length - 1].balance,
+      profile: { ...dataset.profile, dateRange: { start: startDate, end: endDate } },
+    };
+    const safeBusinessName = dataset.profile.businessName.replace(/\s+/g, '_');
+    const fileName = `ABC_Bank_${safeBusinessName}_${startDate}_to_${endDate}.${format}`;
+    if (format === 'pdf') {
+      downloadFile(generatePDF(statement, 'variant1'), fileName, 'application/pdf');
+    } else {
+      downloadFile(generateCSV(statement, 'variant1'), fileName, 'text/csv');
+    }
+    const record: ExportRecord = {
+      id: crypto.randomUUID(),
+      datasetId: dataset.id,
+      format,
+      variant: 'variant1',
+      fileName,
+      createdAt: new Date().toISOString(),
+      rowCount: transactions.length,
+    };
+    addExport(record);
+    setDownloadOpen(false);
+    toast({ title: 'Statement downloaded', description: `${transactions.length} transactions exported as ${format.toUpperCase()}.` });
+  };
 
   return (
     <div className="flex min-h-[100dvh] w-full bg-background overflow-hidden">
@@ -87,9 +147,56 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-[100dvh] overflow-hidden">
-        {/* Mobile Header */}
-        <header className="md:hidden h-14 border-b bg-card flex items-center px-4 shrink-0">
-          <div className="font-bold">ABC Bank</div>
+        <header className="h-16 border-b bg-card/95 backdrop-blur flex items-center justify-between px-4 md:px-8 shrink-0">
+          <div className="font-bold md:hidden">ABC Bank</div>
+          <div className="hidden md:block text-xs font-mono uppercase tracking-wider text-muted-foreground">
+            Fictional business banking environment
+          </div>
+          <Dialog open={downloadOpen} onOpenChange={setDownloadOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={openDownload} disabled={!dataset} className="gap-2 shadow-sm">
+                <Download className="w-4 h-4" />
+                Download bank statement
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Download bank statement</DialogTitle>
+                <DialogDescription>
+                  Choose a file format and statement period. The download will be clearly marked as fictional synthetic data.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-5 py-2">
+                <div className="space-y-2">
+                  <Label>File format</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button type="button" variant={format === 'pdf' ? 'default' : 'outline'} onClick={() => setFormat('pdf')}>PDF</Button>
+                    <Button type="button" variant={format === 'csv' ? 'default' : 'outline'} onClick={() => setFormat('csv')}>CSV</Button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="statement-start">From</Label>
+                    <Input id="statement-start" type="date" value={startDate} onChange={event => setStartDate(event.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="statement-end">To</Label>
+                    <Input id="statement-end" type="date" value={endDate} onChange={event => setEndDate(event.target.value)} />
+                  </div>
+                </div>
+                {startDate && endDate && startDate > endDate && (
+                  <p className="text-sm text-destructive">The start date must be before the end date.</p>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDownloadOpen(false)}>Cancel</Button>
+                <Button onClick={handleStatementDownload} disabled={!startDate || !endDate || startDate > endDate} className="gap-2">
+                  <Download className="w-4 h-4" />
+                  Download {format.toUpperCase()}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </header>
         
         <div className="flex-1 overflow-y-auto p-4 md:p-8 relative">
