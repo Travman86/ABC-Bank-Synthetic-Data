@@ -58,19 +58,30 @@ export async function downloadFile(content: string | Blob, fileName: string, mim
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
   if (isMobile && navigator.share && navigator.canShare?.({ files: [file] })) {
-    await navigator.share({
-      files: [file],
-      title: fileName,
-      text: 'Fictional synthetic bank statement',
-    });
-    return;
+    try {
+      await navigator.share({
+        files: [file],
+        title: fileName,
+        text: 'Fictional synthetic bank statement',
+      });
+      return;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      // Some iOS in-app browsers report file sharing support but reject the
+      // request. Fall through to a direct file preview instead.
+    }
   }
 
   const url = URL.createObjectURL(blob);
+  if (isMobile) {
+    window.location.assign(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    return;
+  }
+
   const link = document.createElement('a');
   link.href = url;
   link.setAttribute('download', fileName);
-  if (isMobile) link.target = '_blank';
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
