@@ -1,0 +1,1 @@
+- [Mobile generated-file downloads](mobile-generated-file-downloads.md) — use normal server PDF responses; iOS in-app browsers reject client-generated Blob and Web Share downloads.

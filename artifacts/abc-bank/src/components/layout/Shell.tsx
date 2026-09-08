@@ -65,7 +65,29 @@ export function Shell({ children }: { children: React.ReactNode }) {
     const safeBusinessName = dataset.profile.businessName.replace(/\s+/g, '_');
     const fileName = `ABC_Bank_${safeBusinessName}_${startDate}_to_${endDate}.${format}`;
     try {
-      if (format === 'pdf') {
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      if (format === 'pdf' && isMobile) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/api/statements/pdf';
+        form.target = '_blank';
+        const payload = document.createElement('input');
+        payload.type = 'hidden';
+        payload.name = 'payload';
+        payload.value = JSON.stringify({
+          businessName: statement.profile.businessName,
+          currency: statement.profile.currency,
+          startDate,
+          endDate,
+          openingBalance: statement.openingBalance,
+          closingBalance: statement.closingBalance,
+          transactions: statement.transactions,
+        });
+        form.appendChild(payload);
+        document.body.appendChild(form);
+        form.submit();
+        document.body.removeChild(form);
+      } else if (format === 'pdf') {
         await downloadFile(generatePDF(statement, 'variant1'), fileName, 'application/pdf');
       } else {
         await downloadFile(generateCSV(statement, 'variant1'), fileName, 'text/csv');

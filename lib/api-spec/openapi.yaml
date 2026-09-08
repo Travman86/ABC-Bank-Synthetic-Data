@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: statements
+    description: Synthetic statement document generation
 paths:
   /healthz:
     get:
@@ -24,6 +26,27 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /statements/pdf:
+    post:
+      operationId: generateStatementPdf
+      tags: [statements]
+      summary: Generate a synthetic PDF bank statement
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/StatementPdfInput"
+      responses:
+        "200":
+          description: Generated PDF statement
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid statement data
 components:
   schemas:
     HealthStatus:
@@ -33,4 +56,12 @@ components:
           type: string
       required:
         - status
+    StatementPdfInput:
+      type: object
+      properties:
+        payload:
+          type: string
+          description: JSON-encoded fictional statement dataset
+      required:
+        - payload
 
