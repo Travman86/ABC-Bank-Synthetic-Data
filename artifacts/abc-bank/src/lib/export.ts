@@ -50,14 +50,31 @@ export function generateCSV(dataset: Dataset, variant: ExportVariant): string {
   return csvContent;
 }
 
-export function downloadFile(content: string | Blob, fileName: string, mimeType: string) {
-  const url = content instanceof Blob ? URL.createObjectURL(content) : `data:${mimeType};charset=utf-8,${encodeURIComponent(content as string)}`;
+export async function downloadFile(content: string | Blob, fileName: string, mimeType: string) {
+  const blob = content instanceof Blob
+    ? content
+    : new Blob([content], { type: `${mimeType};charset=utf-8` });
+  const file = new File([blob], fileName, { type: mimeType });
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+  if (isMobile && navigator.share && navigator.canShare?.({ files: [file] })) {
+    await navigator.share({
+      files: [file],
+      title: fileName,
+      text: 'Fictional synthetic bank statement',
+    });
+    return;
+  }
+
+  const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
   link.setAttribute('download', fileName);
+  if (isMobile) link.target = '_blank';
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 export function generatePDF(dataset: Dataset, variant: ExportVariant): Blob {

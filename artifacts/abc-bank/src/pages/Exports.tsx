@@ -35,10 +35,10 @@ export function Exports() {
 
       if (format === 'csv') {
         const content = generateCSV(dataset, variant);
-        downloadFile(content, `${baseName}_${variant}.csv`, 'text/csv');
+        await downloadFile(content, `${baseName}_${variant}.csv`, 'text/csv');
       } else {
         const content = generatePDF(dataset, variant);
-        downloadFile(content, `${baseName}_${variant}.pdf`, 'application/pdf');
+        await downloadFile(content, `${baseName}_${variant}.pdf`, 'application/pdf');
       }
 
       const newRecord: ExportRecord = {

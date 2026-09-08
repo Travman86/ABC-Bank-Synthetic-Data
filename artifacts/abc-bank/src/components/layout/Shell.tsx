@@ -41,7 +41,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     setDownloadOpen(true);
   };
 
-  const handleStatementDownload = () => {
+  const handleStatementDownload = async () => {
     if (!dataset || !startDate || !endDate || startDate > endDate) return;
     const transactions = dataset.transactions.filter(transaction => {
       const date = transaction.date.slice(0, 10);
@@ -64,10 +64,16 @@ export function Shell({ children }: { children: React.ReactNode }) {
     };
     const safeBusinessName = dataset.profile.businessName.replace(/\s+/g, '_');
     const fileName = `ABC_Bank_${safeBusinessName}_${startDate}_to_${endDate}.${format}`;
-    if (format === 'pdf') {
-      downloadFile(generatePDF(statement, 'variant1'), fileName, 'application/pdf');
-    } else {
-      downloadFile(generateCSV(statement, 'variant1'), fileName, 'text/csv');
+    try {
+      if (format === 'pdf') {
+        await downloadFile(generatePDF(statement, 'variant1'), fileName, 'application/pdf');
+      } else {
+        await downloadFile(generateCSV(statement, 'variant1'), fileName, 'text/csv');
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      toast({ title: 'Download failed', description: 'The statement could not be prepared on this device.', variant: 'destructive' });
+      return;
     }
     const record: ExportRecord = {
       id: crypto.randomUUID(),
