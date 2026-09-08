@@ -54,27 +54,28 @@ export async function downloadFile(content: string | Blob, fileName: string, mim
   const blob = content instanceof Blob
     ? content
     : new Blob([content], { type: `${mimeType};charset=utf-8` });
-  const file = new File([blob], fileName, { type: mimeType });
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-  if (isMobile && navigator.share && navigator.canShare?.({ files: [file] })) {
-    try {
-      await navigator.share({
-        files: [file],
-        title: fileName,
-        text: 'Fictional synthetic bank statement',
-      });
-      return;
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return;
-      // Some iOS in-app browsers report file sharing support but reject the
-      // request. Fall through to a direct file preview instead.
-    }
-  }
-
   const url = URL.createObjectURL(blob);
+
   if (isMobile) {
-    window.location.assign(url);
+    // iOS in-app browsers commonly block both Web Share file payloads and
+    // download-attribute links. A synchronous preview tab is supported and
+    // lets the user use the browser's Share / Save to Files controls.
+    const preview = window.open('about:blank', '_blank');
+    if (preview) {
+      preview.document.title = fileName;
+      preview.document.body.innerHTML =
+        '<p style="font:16px system-ui;padding:24px">Preparing statement…</p>';
+      preview.location.replace(url);
+    } else {
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
     window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     return;
   }
