@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "ABC Bank"
+description = "A professional synthetic banking data studio for customer demonstrations and agent training. Users describe a fictional business, generate realistic transaction histories, review account activity, and export visibly marked synthetic statements in varied PDF and CSV formats."
+version = "1.0.0"
+id = "artifacts/abc-bank"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25791
+
+[services.development]
+run = "pnpm --filter @workspace/abc-bank run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/abc-bank", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/abc-bank/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25791"
+BASE_PATH = "/"
