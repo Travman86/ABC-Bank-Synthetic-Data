@@ -1,0 +1,20 @@
+// ABC Bank on Cloudflare: the SPA via Workers Static Assets, and the tiny API
+// (health check + statement PDF) in this Worker itself. The API needs no
+// database, storage or secrets, so there is no container.
+//
+// Deploy:  pnpm --filter @workspace/cloudflare-edge run deploy
+// Pushing to main deploys automatically (.github/workflows/deploy-cloudflare.yml).
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "abc-bank",
+  "account_id": "85fb1541373c78e0b296968487949f70",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "observability": { "enabled": true },
+  "assets": {
+    "directory": "../abc-bank/dist/public",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  }
+}
